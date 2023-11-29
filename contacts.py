@@ -31,11 +31,11 @@ class Contacts:
         cursor = self.connection.cursor()
 
         for index, contact in enumerate(contacts):
-            cursor.execute("""
+            cursor.executemany("""
                 insert into contacts(name, email) values (
                     ?, ?
                 )
-            """, (contact[0], contact[1]))
+            """, [contact[0], contact[1]])
 
     def get_name_for_email(self, email):
         print("Looking for email", email)
