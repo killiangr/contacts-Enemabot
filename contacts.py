@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from faker import Faker
 
+
 class Contacts:
     def __init__(self, db_path):
         self.db_path = db_path
@@ -14,9 +15,8 @@ class Contacts:
             cursor.execute(
                 """
                 CREATE TABLE contacts(
-                  id INTEGER PRIMARY KEY,
                   name TEXT NOT NULL,
-                  email TEXT NOT NULL
+                  email TEXT NOT NULL PRIMARY KEY 
                 );
                 
                 CREATE UNIQUE INDEX index_contacts_email ON contacts(email);
@@ -26,16 +26,19 @@ class Contacts:
         self.connection = sqlite3.connect(db_path)
         self.connection.row_factory = sqlite3.Row
 
-    def insert_contacts(self, contacts: [str, str]):
+    def insert_contacts(self, contacts):
         print("Inserting contacts")
         cursor = self.connection.cursor()
+        last = None
 
-        for index, contact in enumerate(contacts):
-            cursor.executemany("""
-                insert into contacts(name, email) values (
-                    ?, ?
-                )
-            """, [contact[0], contact[1]])
+        with self.connection:
+            for index, contact in enumerate(contacts):
+                print("inserting contact: ", contact)
+                cursor.execute("""
+                    insert into contacts (name, email) values (?, ?)
+                """, (contact[0], contact[1]))
+                last = contact
+        return last
 
     def get_name_for_email(self, email):
         print("Looking for email", email)
@@ -63,8 +66,7 @@ class Contacts:
 
 def yield_contacts(num_contacts: int):
     faker = Faker()
-    yield "charlie", "charlie@acme.corp"
-    for i in range(1, num_contacts):
+    for i in range(0, num_contacts):
         yield faker.name(), faker.email()
 
 
@@ -72,8 +74,17 @@ def main():
     num_contacts = int(sys.argv[1])
     db_path = Path("contacts.sqlite3")
     contacts = Contacts(db_path)
-    contacts.insert_contacts(yield_contacts(num_contacts))
-    charlie = contacts.get_name_for_email("charlie@acme.corp")
+
+    if contacts.connection is None:
+        raise OSError("no connection")
+
+    all_contacts = yield_contacts(num_contacts)
+    last_user = contacts.insert_contacts(all_contacts)
+    found_user = contacts.get_name_for_email(last_user[1])
+
+    # sometimes it doesn't find the last user because the mail generator generates the same email for the user
+
+    print("found ", found_user)
 
 
 if __name__ == "__main__":
